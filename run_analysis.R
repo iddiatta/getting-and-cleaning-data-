@@ -7,75 +7,78 @@
 ## setting the wd (working directory)
 wd <-setwd("/Users/ibrahimadinadiatta/Desktop/Data Science Specialization/Cours_Getting_and_Cleaning_Data/UCI_HAR_Dataset/project_data ")
 
+##1. Downloading and unzipping dataset
+if(!file.exists("./data")){dir.create("./data")}
+fileUrl <- "https://d396qusza40orc.cloudfront.net/getdata%2Fprojectfiles%2FUCI%20HAR%20Dataset.zip"
+download.file(fileUrl,destfile="./data/Dataset.zip")
+
+# Unzip dataSet to the current directory
+unzip(zipfile="./data/Dataset.zip",exdir="./data")
+
+##2. Merging the training and the test sets to create one data set:
+
+# Reading trainings tables:
+x_train <- read.table("./data/UCI HAR Dataset/train/X_train.txt")
+y_train <- read.table("./data/UCI HAR Dataset/train/y_train.txt")
+subject_train <- read.table("./data/UCI HAR Dataset/train/subject_train.txt")
+
+# Reading testing tables:
+x_test <- read.table("./data/UCI HAR Dataset/test/X_test.txt")
+y_test <- read.table("./data/UCI HAR Dataset/test/y_test.txt")
+subject_test <- read.table("./data/UCI HAR Dataset/test/subject_test.txt")
+
+# Reading feature vector:
+features <- read.table('./data/UCI HAR Dataset/features.txt')
+
+# Reading activity labels:
+activityLabels = read.table('./data/UCI HAR Dataset/activity_labels.txt')
+
+## Assigning column names:
+        
+colnames(x_train) <- features[,2] 
+colnames(y_train) <-"activityId"
+colnames(subject_train) <- "subjectId"
+
+colnames(x_test) <- features[,2] 
+colnames(y_test) <- "activityId"
+colnames(subject_test) <- "subjectId"
+
+colnames(activityLabels) <- c('activityId','activityType')
+
+## Merging all data in one set:
+        
+mrg_train <- cbind(y_train, subject_train, x_train)
+mrg_test <- cbind(y_test, subject_test, x_test)
+setAllInOne <- rbind(mrg_train, mrg_test)
+codebook <-prompt(setAllInOne)
 
 
-## uploading the activitylabels df (data frame)  
-activityLabels <- read.csv("activity_labels.txt", sep="", header=FALSE)
+## Extracting only the measurements on the mean and standard deviation for each measurement
+## Reading column names:
+        
+colNames <- colnames(setAllInOne)
 
-## uploading the features df  
-features <- read.csv("features.txt", sep="", header=FALSE)
-features[,2] = gsub('-std', 'Std', features[,2])
-features[,2] = gsub('[-()-]', '', features[,2])
+## Create vector for defining ID, mean and standard deviation:
+        
+        mean_and_std <- (grepl("activityId" , colNames) | 
+                                 grepl("subjectId" , colNames) | 
+                                 grepl("mean.." , colNames) | 
+                                 grepl("std.." , colNames) 
+        )
+## Making nessesary subset from setAllInOne:
+        
+        setForMeanAndStd <- setAllInOne[ , mean_and_std == TRUE]
+## Using descriptive activity names to name the activities in the data set:
+        setWithActivityNames <- merge(setForMeanAndStd, activityLabels,
+                                      by='activityId',
+                                      all.x=TRUE)
+## Creating a second, independent tidy data set with the average of each variable for each activity and each subject:
+ ##      Making second tidy data set
 
-
-## uploading the training data set 
-X_train<- read.csv ("X_train.txt", sep="", header=FALSE)
-
-
-## uploading the data frame of labels 
-y_train <- read.csv("y_train.txt", sep="", header=FALSE)
-
-
-## uploading subject data set 
-subject_train <- read.csv("subject_train.txt", sep="", header=FALSE)
-
-
-## merging the 3 df : subject train, y_train, X_train
-training <- cbind(X_train,y_train,subject_train)
-
-
-## getting the testing data set 
-
-X_test <- read.csv ("X_test.txt", sep="", header=FALSE)
-
-y_test <- read.csv("y_test.txt", sep="", header=FALSE)
-
-subject_test <- read.csv("subject_test.txt", sep="", header=FALSE)
-
-testing <- cbind(X_test,y_test, subject_test)
-
-# Merge training and testing datasets
-Combined_Data = rbind(training, testing)
-
-#  naming the colunms of the data set of the experience
-
-colnames(Combined_Data) <- c(features$V2, "Activity", "Subject")
+secTidySet <- aggregate(. ~subjectId + activityId, setWithActivityNames, mean)
+secTidySet <- secTidySet[order(secTidySet$subjectId, secTidySet$activityId),]
 
 
-## Get only the data on mean and std. dev.
-TargetCol <- c(grep(".*Mean.*|.*Std.*", features[,2]),562,563)
-Combined_Data <- Combined_Data[,TargetCol]
+## Writing second tidy data set in txt file
 
-# naming the col of the df 
-colnames(Combined_Data) <- c(features$V2, "Activity", "Subject")
- 
- ## here we'll label the activity levels 
- 
- class(Combined_Data$Activity)
- 
- Combined_Data$Activity<- as.factor(Combined_Data$Activity)
- Combined_Data$Subject <- as.factor(Combined_Data$Subject)
- 
- Combined_Data$Activity <- ordered(Combined_Data$Activity, levels=as.integer(levels(Combined_Data$Activity)), labels=as.character(activityLabels$V2))
- 
-## 
-
- tidy <- aggregate(Combined_Data, by=list(Activity=Combined_Data$Activity,Subject=Combined_Data$Subject), FUN = mean)
- 
- tidy <- tidy [,1:42]
- 
- write.table(tidy, "tidy.txt", sep="\t")
- 
- 
- 
- 
+write.table(secTidySet, "tidy.txt", row.name=FALSE)
